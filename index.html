@@ -123,6 +123,95 @@
       document.getElementById('lampadaFields').style.display = type === 'lampada' ? 'block' : 'none';
     });
 
+    function saveReports(reports) {
+      localStorage.setItem("reports", JSON.stringify(reports));
+    }
+
+    function loadReports() {
+      return JSON.parse(localStorage.getItem("reports") || "[]");
+    }
+
+    function updateTable(filter = "todos") {
+      const tbody = document.querySelector("#reportTable tbody");
+      tbody.innerHTML = "";
+      let reports = loadReports();
+      let counts = { buraco: 0, lampada: 0, outro: 0 };
+
+      reports.forEach((r, i) => {
+        if (filter !== "todos" && r.type !== filter) return;
+        counts[r.type]++;
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${r.type}</td>
+          <td>${r.description}</td>
+          <td>${r.priority}</td>
+          <td>${r.latitude}</td>
+          <td>${r.longitude}</td>
+          <td>${r.confirmations}</td>
+          <td>
+            <button onclick="confirmProblem(${i})">Confirmar</button>
+            <button onclick="deleteReport(${i})" class="delete-btn">Excluir</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      document.getElementById("counter").innerText = `Buracos: ${counts.buraco} | Lâmpadas: ${counts.lampada} | Outros: ${counts.outro}`;
+    }
+
+    function confirmProblem(index) {
+      const reports = loadReports();
+      reports[index].confirmations++;
+      saveReports(reports);
+      updateTable(document.getElementById("filter").value);
+    }
+
+    function deleteReport(index) {
+      const reports = loadReports();
+      reports.splice(index, 1);
+      saveReports(reports);
+      updateTable(document.getElementById("filter").value);
+    }
+
+    function adminClear() {
+      if (confirm("Tem certeza que deseja excluir todos os registros?")) {
+        localStorage.removeItem("reports");
+        updateTable();
+      }
+    }
+
+    function adminExport() {
+      const reports = loadReports();
+      let csv = "Tipo,Descrição,Urgência,Latitude,Longitude,Confirmações\n";
+      reports.forEach(r => {
+        csv += `${r.type},"${r.description}",${r.priority},${r.latitude},${r.longitude},${r.confirmations}\n`;
+      });
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "reportes.csv";
+      a.click();
+    }
+
+    document.getElementById("reportForm").addEventListener("submit", e => {
+      e.preventDefault();
+      const type = document.getElementById("type").value;
+      const description = document.getElementById("description").value;
+      const priority = document.getElementById("priority").value;
+      const latitude = document.getElementById("latitude").value;
+      const longitude = document.getElementById("longitude").value;
+      const poste = document.getElementById("poste").value;
+      const newReport = { type, description, priority, latitude, longitude, confirmations: 0 };
+      if (type === "lampada") newReport.poste = poste;
+      const reports = loadReports();
+      reports.push(newReport);
+      saveReports(reports);
+      updateTable();
+      alert("Problema enviado com sucesso!");
+      e.target.reset();
+    });
+
     function loginAdmin() {
       const user = document.getElementById("adminUser").value;
       const pass = document.getElementById("adminPass").value;
@@ -141,13 +230,17 @@
       document.getElementById("loginContainer").style.display = "block";
     }
 
+    document.getElementById("filter").addEventListener("change", () => {
+      updateTable(document.getElementById("filter").value);
+    });
+
     window.onload = function () {
       if (localStorage.getItem("isAdmin") === "true") {
         document.getElementById("adminPanel").style.display = "block";
         document.getElementById("loginContainer").style.display = "none";
       }
+      updateTable();
     };
   </script>
 </body>
 </html>
-
