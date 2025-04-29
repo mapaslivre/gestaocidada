@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestão Cidadã - Vitória de Santo Antão</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
+    #map { height: 50vh; width: 100%; }
+    .layout { display: flex; gap: 20px; justify-content: center; align-items: flex-start; flex-wrap: wrap; padding: 20px; }
+    .form-column, .filter-column { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); max-width: 500px; flex: 1; min-width: 300px; }
+    label, select, input, textarea { display: block; margin: 5px 0; width: 100%; }
+    .report-card { background: #fff; border-left: 5px solid #2196F3; padding: 10px; margin-bottom: 10px; border-radius: 5px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .report-card.buraco { border-color: #f44336; }
+    .report-card.lampada { border-color: #ffc107; }
+    .report-card.outro { border-color: #4caf50; }
+    .report-card img { max-width: 100px; max-height: 100px; display: block; margin-top: 10px; }
+    .card-actions { margin-top: 10px; }
+    .card-actions button { margin-right: 5px; }
+    .counter, .filter-bar { text-align: center; margin: 15px 0; }
+    #loginContainer { text-align: center; margin-top: 20px; }
+    .suggestions, .status, .comments { margin-top: 20px; padding: 10px; background: #e9e9e9; border-radius: 5px; }
+    .comments textarea { width: 100%; height: 50px; }
+    .comments ul { padding-left: 20px; }
+    .comments ul li { margin-bottom: 5px; }
+  </style>
+</head>
+<body>
+  <h2 style="text-align: center">Gestão Cidadã - Vitória de Santo Antão</h2>
+  <div id="map"></div>
+
+  <div class="layout">
+    <div class="form-column">
+      <form id="reportForm">
+        <label for="name">Nome ou Apelido (opcional):</label>
+        <input type="text" id="name" />
+
+        <label for="type">Tipo de Problema:</label>
+        <select id="type" required onchange="toggleLampadaFields()">
+          <option value="buraco">Buraco na via</option>
+          <option value="lampada">Lâmpada queimada</option>
+          <option value="outro">Outro</option>
+        </select>
+
+        <div id="lampadaFields" style="display:none">
+          <label for="poste">Número do Poste:</label>
+          <input type="text" id="poste" />
+        </div>
+
+        <label for="description">Descrição:</label>
+        <textarea id="description" required></textarea>
+
+        <label for="priority">Urgência:</label>
+        <select id="priority">
+          <option value="baixa">Baixa</option>
+          <option value="média">Média</option>
+          <option value="alta">Alta</option>
+        </select>
+
+        <label for="status">Status do Problema:</label>
+        <select id="status">
+          <option value="pendente">Pendente</option>
+          <option value="resolvido">Resolvido</option>
+        </select>
+
+        <label for="photo">Foto do Problema:</label>
+        <input type="file" id="photo" accept="image/*" />
+
+        <label for="latitude">Latitude:</label>
+        <input type="text" id="latitude" readonly required />
+
+        <label for="longitude">Longitude:</label>
+        <input type="text" id="longitude" readonly required />
+
+        <button type="submit">Enviar</button>
+      </form>
+
+      <div class="counter" id="counter"></div>
+
+      <div class="suggestions">
+        <h4>Sugestões Gerais</h4>
+        <textarea id="suggestionInput" placeholder="Deixe aqui sua sugestão..."></textarea>
+        <button onclick="submitSuggestion()">Enviar Sugestão</button>
+        <ul id="suggestionList"></ul>
+      </div>
+
+      <div class="actions" id="adminPanel">
+        <button onclick="adminExport()">Exportar CSV</button>
+        <button onclick="adminClear()">Excluir Todos</button>
+        <button onclick="logoutAdmin()">Sair</button>
+      </div>
+
+      <div id="loginContainer">
+        <h3>Login do Administrador</h3>
+        <input type="text" id="adminUser" placeholder="Usuário" />
+        <input type="password" id="adminPass" placeholder="Senha" />
+        <button onclick="loginAdmin()">Entrar</button>
+        <p id="loginMessage" style="color: red;"></p>
+      </div>
+    </div>
+
+    <div class="filter-column">
+      <div class="filter-bar">
+        <label for="filter">Filtrar por tipo:</label>
+        <select id="filter" onchange="filterReports()">
+          <option value="todos">Todos</option>
+          <option value="buraco">Buraco na via</option>
+          <option value="lampada">Lâmpada queimada</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+      <div id="reports"></div>
+    </div>
+  </div>
+
+  <script>
+    function submitSuggestion() {
+      const input = document.getElementById("suggestionInput");
+      const list = document.getElementById("suggestionList");
+      if (input.value.trim()) {
+        const item = document.createElement("li");
+        item.textContent = input.value;
+        list.appendChild(item);
+        input.value = "";
+      }
+    }
+
+    function toggleLampadaFields() {
+      const type = document.getElementById("type").value;
+      document.getElementById("lampadaFields").style.display = type === "lampada" ? "block" : "none";
+    }
+
+    function filterReports() {
+      console.log("Filtrar relatórios por tipo");
+    }
+
+    // Inicializar o mapa
+    const map = L.map('map').setView([-8.1211, -35.2975], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    map.on('click', function (e) {
+      const { lat, lng } = e.latlng;
+      document.getElementById('latitude').value = lat.toFixed(6);
+      document.getElementById('longitude').value = lng.toFixed(6);
+
+      if (window.lastMarker) {
+        map.removeLayer(window.lastMarker);
+      }
+      window.lastMarker = L.marker([lat, lng]).addTo(map);
+    });
+  </script>
+</body>
+</html>
+
