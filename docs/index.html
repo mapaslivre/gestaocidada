@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestão Cidadã - Vitória de Santo Antão</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <style>
+    #map { height: 80vh; width: 100%; }
+    form { padding: 10px; }
+    label, select, input, textarea { display: block; margin: 5px 0; width: 100%; }
+    .form-container { max-width: 400px; margin: auto; }
+  </style>
+</head>
+<body>
+  <h2 style="text-align: center">Gestão Cidadã - Vitória de Santo Antão</h2>
+  <div id="map"></div>
+
+  <div class="form-container">
+    <form id="reportForm">
+      <label for="type">Tipo de Problema:</label>
+      <select id="type" required>
+        <option value="buraco">Buraco na via</option>
+        <option value="lampada">Lâmpada queimada</option>
+      </select>
+
+      <label for="description">Descrição:</label>
+      <textarea id="description" required></textarea>
+
+      <label for="latitude">Latitude:</label>
+      <input type="text" id="latitude" readonly required />
+
+      <label for="longitude">Longitude:</label>
+      <input type="text" id="longitude" readonly required />
+
+      <button type="submit">Enviar</button>
+    </form>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([-8.1208, -35.2976], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let marker;
+    map.on('click', function(e) {
+      const { lat, lng } = e.latlng;
+      document.getElementById('latitude').value = lat.toFixed(6);
+      document.getElementById('longitude').value = lng.toFixed(6);
+
+      if (marker) map.removeLayer(marker);
+      marker = L.marker([lat, lng]).addTo(map);
+    });
+
+    const form = document.getElementById('reportForm');
+    const iconMap = {
+      buraco: '🕳️',
+      lampada: '💡'
+    };
+
+    const savedReports = JSON.parse(localStorage.getItem('reports') || '[]');
+    savedReports.forEach(r => addMarker(r));
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const type = document.getElementById('type').value;
+      const description = document.getElementById('description').value;
+      const latitude = parseFloat(document.getElementById('latitude').value);
+      const longitude = parseFloat(document.getElementById('longitude').value);
+
+      const report = { type, description, latitude, longitude };
+      savedReports.push(report);
+      localStorage.setItem('reports', JSON.stringify(savedReports));
+
+      addMarker(report);
+      form.reset();
+      alert('Problema registrado com sucesso!');
+    });
+
+    function addMarker(report) {
+      const iconText = iconMap[report.type] || '❗';
+      const popup = `${iconText} <strong>${report.type.toUpperCase()}</strong><br>${report.description}`;
+      L.marker([report.latitude, report.longitude])
+        .addTo(map)
+        .bindPopup(popup);
+    }
+  </script>
+</body>
+</html>
+

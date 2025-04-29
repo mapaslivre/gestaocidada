@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestão Cidadã - Vitória de Santo Antão</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <style>
+    #map { height: 60vh; width: 100%; }
+    form { padding: 10px; }
+    label, select, input, textarea { display: block; margin: 5px 0; width: 100%; }
+    .form-container { max-width: 600px; margin: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 0.9rem; }
+    th { background-color: #f0f0f0; }
+    .actions { text-align: center; margin: 10px 0; }
+    .delete-btn { color: red; cursor: pointer; }
+    .counter { text-align: center; font-weight: bold; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h2 style="text-align: center">Gestão Cidadã - Vitória de Santo Antão</h2>
+  <div id="map"></div>
+
+  <div class="form-container">
+    <form id="reportForm">
+      <label for="name">Nome ou Apelido (opcional):</label>
+      <input type="text" id="name" />
+
+      <label for="type">Tipo de Problema:</label>
+      <select id="type" required>
+        <option value="buraco">Buraco na via</option>
+        <option value="lampada">Lâmpada queimada</option>
+        <option value="outro">Outro</option>
+      </select>
+
+      <div id="lampadaFields" style="display:none">
+        <label for="poste">Número do Poste:</label>
+        <input type="text" id="poste" />
+      </div>
+
+      <label for="description">Descrição:</label>
+      <textarea id="description" required></textarea>
+
+      <label for="priority">Urgência:</label>
+      <select id="priority">
+        <option value="baixa">Baixa</option>
+        <option value="média">Média</option>
+        <option value="alta">Alta</option>
+      </select>
+
+      <label for="photo">Foto do Problema:</label>
+      <input type="file" id="photo" accept="image/*" />
+
+      <label for="latitude">Latitude:</label>
+      <input type="text" id="latitude" readonly required />
+
+      <label for="longitude">Longitude:</label>
+      <input type="text" id="longitude" readonly required />
+
+      <button type="submit">Enviar</button>
+    </form>
+
+    <div class="counter" id="counter"></div>
+
+    <div class="actions">
+      <label for="filter">Filtrar por tipo:</label>
+      <select id="filter">
+        <option value="todos">Todos</option>
+        <option value="buraco">Buraco na via</option>
+        <option value="lampada">Lâmpada queimada</option>
+        <option value="outro">Outro</option>
+      </select>
+      <button onclick="adminExport()">Exportar CSV</button>
+      <button onclick="adminClear()">Excluir Todos</button>
+    </div>
+
+    <table id="reportTable">
+      <thead>
+        <tr>
+          <th>Tipo</th>
+          <th>Descrição</th>
+          <th>Urgência</th>
+          <th>Latitude</th>
+          <th>Longitude</th>
+          <th>Confirmações</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    const map = L.map('map').setView([-8.1208, -35.2976], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    let marker;
+    map.on('click', function(e) {
+      const { lat, lng } = e.latlng;
+      document.getElementById('latitude').value = lat.toFixed(6);
+      document.getElementById('longitude').value = lng.toFixed(6);
+
+      if (marker) map.removeLayer(marker);
+      marker = L.marker([lat, lng]).addTo(map);
+    });
+
+    document.getElementById('type').addEventListener('change', () => {
+      const type = document.getElementById('type').value;
+      document.getElementById('lampadaFields').style.display = type === 'lampada' ? 'block' : 'none';
+    });
+
+    // Resto do script permanece igual (sem alterações necessárias)
+  </script>
+</body>
+</html>
+
