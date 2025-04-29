@@ -133,9 +133,25 @@
     }
 
     function filterReports() {
-      // Esta função será implementada com base nos dados carregados
       console.log("Filtrar relatórios por tipo");
     }
+
+    // Inicializar o mapa
+    const map = L.map('map').setView([-8.1211, -35.2975], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    map.on('click', function (e) {
+      const { lat, lng } = e.latlng;
+      document.getElementById('latitude').value = lat.toFixed(6);
+      document.getElementById('longitude').value = lng.toFixed(6);
+
+      if (window.lastMarker) {
+        map.removeLayer(window.lastMarker);
+      }
+      window.lastMarker = L.marker([lat, lng]).addTo(map);
+    });
   </script>
 </body>
 </html>
