@@ -7,19 +7,16 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
-    #map { height: 50vh; width: 100%; }
+    #map { height: 60vh; width: 100%; }
     form { padding: 10px; }
     label, select, input, textarea { display: block; margin: 5px 0; width: 100%; }
-    .form-container { max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-    .report-card { background: #fff; border-left: 5px solid #2196F3; padding: 10px; margin-bottom: 10px; border-radius: 5px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
-    .report-card.buraco { border-color: #f44336; }
-    .report-card.lampada { border-color: #ffc107; }
-    .report-card.outro { border-color: #4caf50; }
-    .report-card img { max-width: 100px; max-height: 100px; display: block; margin-top: 10px; }
-    .card-actions { margin-top: 10px; }
-    .card-actions button { margin-right: 5px; }
-    .counter, .filter-bar { text-align: center; margin: 15px 0; }
+    .form-container { max-width: 600px; margin: auto; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; font-size: 0.9rem; }
+    th { background-color: #f0f0f0; }
+    .actions { text-align: center; margin: 10px 0; display: none; }
+    .delete-btn { color: red; cursor: pointer; }
+    .counter { text-align: center; font-weight: bold; margin-top: 10px; }
     #loginContainer { text-align: center; margin-top: 20px; }
   </style>
 </head>
@@ -68,7 +65,7 @@
 
     <div class="counter" id="counter"></div>
 
-    <div class="filter-bar">
+    <div class="actions" id="adminPanel">
       <label for="filter">Filtrar por tipo:</label>
       <select id="filter">
         <option value="todos">Todos</option>
@@ -76,11 +73,6 @@
         <option value="lampada">Lâmpada queimada</option>
         <option value="outro">Outro</option>
       </select>
-    </div>
-
-    <div id="reports"></div>
-
-    <div class="actions" id="adminPanel">
       <button onclick="adminExport()">Exportar CSV</button>
       <button onclick="adminClear()">Excluir Todos</button>
       <button onclick="logoutAdmin()">Sair</button>
@@ -93,16 +85,25 @@
       <button onclick="loginAdmin()">Entrar</button>
       <p id="loginMessage" style="color: red;"></p>
     </div>
+
+    <table id="reportTable">
+      <thead>
+        <tr>
+          <th>Tipo</th>
+          <th>Descrição</th>
+          <th>Urgência</th>
+          <th>Latitude</th>
+          <th>Longitude</th>
+          <th>Confirmações</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </div>
 
   <script>
     const map = L.map('map').setView([-8.1208, -35.2976], 14);
-    const icons = {
-      buraco: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/565/565547.png', iconSize: [32, 32] }),
-      lampada: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/427/427735.png', iconSize: [32, 32] }),
-      outro: L.icon({ iconUrl: 'https://cdn-icons-png.flaticon.com/512/484/484662.png', iconSize: [32, 32] })
-    };
-
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
@@ -130,38 +131,29 @@
       return JSON.parse(localStorage.getItem("reports") || "[]");
     }
 
-    function updateReports(filter = "todos") {
-      const container = document.getElementById("reports");
-      container.innerHTML = "";
-      const reports = loadReports();
+    function updateTable(filter = "todos") {
+      const tbody = document.querySelector("#reportTable tbody");
+      tbody.innerHTML = "";
+      let reports = loadReports();
       let counts = { buraco: 0, lampada: 0, outro: 0 };
 
       reports.forEach((r, i) => {
         if (filter !== "todos" && r.type !== filter) return;
         counts[r.type]++;
-
-        const div = document.createElement("div");
-        div.className = `report-card ${r.type}`;
-        div.innerHTML = `
-          <strong>Tipo:</strong> ${r.type}<br>
-          <strong>Descrição:</strong> ${r.description}<br>
-          <strong>Urgência:</strong> ${r.priority}<br>
-          <strong>Local:</strong> ${r.latitude}, ${r.longitude}<br>
-          ${r.poste ? `<strong>Nº do Poste:</strong> ${r.poste}<br>` : ""}
-          ${r.name ? `<strong>Morador:</strong> ${r.name}<br>` : ""}
-          ${r.photoName ? `<img src="${r.photoName}" alt="Foto">` : ""}
-          <strong>Confirmações:</strong> ${r.confirmations || 0}<br>
-          <div class="card-actions">
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${r.type}</td>
+          <td>${r.description}</td>
+          <td>${r.priority}</td>
+          <td>${r.latitude}</td>
+          <td>${r.longitude}</td>
+          <td>${r.confirmations}</td>
+          <td>
             <button onclick="confirmProblem(${i})">Confirmar</button>
             <button onclick="deleteReport(${i})" class="delete-btn">Excluir</button>
-          </div>
+          </td>
         `;
-        container.appendChild(div);
-
-        if (r.latitude && r.longitude) {
-          const marker = L.marker([r.latitude, r.longitude], { icon: icons[r.type] || icons.outro }).addTo(map);
-          marker.bindPopup(`<strong>${r.type}</strong><br>${r.description}`);
-        }
+        tbody.appendChild(row);
       });
 
       document.getElementById("counter").innerText = `Buracos: ${counts.buraco} | Lâmpadas: ${counts.lampada} | Outros: ${counts.outro}`;
@@ -169,22 +161,22 @@
 
     function confirmProblem(index) {
       const reports = loadReports();
-      reports[index].confirmations = (reports[index].confirmations || 0) + 1;
+      reports[index].confirmations++;
       saveReports(reports);
-      updateReports(document.getElementById("filter").value);
+      updateTable(document.getElementById("filter").value);
     }
 
     function deleteReport(index) {
       const reports = loadReports();
       reports.splice(index, 1);
       saveReports(reports);
-      updateReports(document.getElementById("filter").value);
+      updateTable(document.getElementById("filter").value);
     }
 
     function adminClear() {
       if (confirm("Tem certeza que deseja excluir todos os registros?")) {
         localStorage.removeItem("reports");
-        updateReports();
+        updateTable();
       }
     }
 
@@ -192,7 +184,7 @@
       const reports = loadReports();
       let csv = "Tipo,Descrição,Urgência,Latitude,Longitude,Confirmações\n";
       reports.forEach(r => {
-        csv += `${r.type},"${r.description}",${r.priority},${r.latitude},${r.longitude},${r.confirmations || 0}\n`;
+        csv += `${r.type},"${r.description}",${r.priority},${r.latitude},${r.longitude},${r.confirmations}\n`;
       });
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
@@ -210,18 +202,12 @@
       const latitude = document.getElementById("latitude").value;
       const longitude = document.getElementById("longitude").value;
       const poste = document.getElementById("poste").value;
-      const name = document.getElementById("name").value;
-      const photoFile = document.getElementById("photo").files[0];
-
-      const newReport = { type, description, priority, latitude, longitude, poste, name, confirmations: 0 };
-      if (photoFile) {
-        newReport.photoName = URL.createObjectURL(photoFile);
-      }
-
+      const newReport = { type, description, priority, latitude, longitude, confirmations: 0 };
+      if (type === "lampada") newReport.poste = poste;
       const reports = loadReports();
       reports.push(newReport);
       saveReports(reports);
-      updateReports();
+      updateTable();
       alert("Problema enviado com sucesso!");
       e.target.reset();
     });
@@ -233,15 +219,6 @@
         localStorage.setItem("isAdmin", "true");
         document.getElementById("adminPanel").style.display = "block";
         document.getElementById("loginContainer").style.display = "none";
-
-        const filterSelect = document.getElementById("filter");
-        if (filterSelect) {
-          filterSelect.addEventListener("change", () => {
-            updateReports(filterSelect.value);
-          });
-        }
-
-        updateReports();
       } else {
         document.getElementById("loginMessage").innerText = "Usuário ou senha incorretos.";
       }
@@ -253,21 +230,17 @@
       document.getElementById("loginContainer").style.display = "block";
     }
 
+    document.getElementById("filter").addEventListener("change", () => {
+      updateTable(document.getElementById("filter").value);
+    });
+
     window.onload = function () {
       if (localStorage.getItem("isAdmin") === "true") {
         document.getElementById("adminPanel").style.display = "block";
         document.getElementById("loginContainer").style.display = "none";
-
-        const filterSelect = document.getElementById("filter");
-        if (filterSelect) {
-          filterSelect.addEventListener("change", () => {
-            updateReports(filterSelect.value);
-          });
-        }
       }
-      updateReports();
+      updateTable();
     };
   </script>
 </body>
 </html>
-
