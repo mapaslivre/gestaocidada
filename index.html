@@ -30,42 +30,41 @@
 <body>
   <h2 style="text-align: center">Gestão Cidadã - Vitória de Santo Antão</h2>
   <div id="map"></div>
-
   <div class="layout">
     <div class="form-column">
+      <h3>Registrar Problema</h3>
       <form id="reportForm">
-        <label for="name">Nome ou Apelido (opcional):</label>
-        <input type="text" id="name" />
-
-        <label for="type">Tipo de Problema:</label>
-        <select id="type" required onchange="toggleLampadaFields()">
-          <option value="buraco">Buraco na via</option>
-          <option value="lampada">Lâmpada queimada</option>
+        <label for="type">Tipo de problema:</label>
+        <select id="type" required>
+          <option value="">Selecione</option>
+          <option value="buraco">Buraco</option>
+          <option value="lampada">Lâmpada</option>
           <option value="outro">Outro</option>
         </select>
 
-        <div id="lampadaFields" style="display:none">
-          <label for="poste">Número do Poste:</label>
-          <input type="text" id="poste" />
+        <div id="lampadaFields" style="display:none;">
+          <label for="poste">Número do poste:</label>
+          <input type="text" id="poste" name="poste" />
         </div>
 
         <label for="description">Descrição:</label>
         <textarea id="description" required></textarea>
 
         <label for="priority">Urgência:</label>
-        <select id="priority">
+        <select id="priority" required>
           <option value="baixa">Baixa</option>
           <option value="média">Média</option>
           <option value="alta">Alta</option>
         </select>
 
-        <label for="status">Status do Problema:</label>
-        <select id="status">
+        <label for="status">Status:</label>
+        <select id="status" required>
           <option value="pendente">Pendente</option>
+          <option value="em andamento">Em andamento</option>
           <option value="resolvido">Resolvido</option>
         </select>
 
-        <label for="photo">Foto do Problema:</label>
+        <label for="photo">Foto (opcional):</label>
         <input type="file" id="photo" accept="image/*" />
 
         <label for="latitude">Latitude:</label>
@@ -76,82 +75,121 @@
 
         <button type="submit">Enviar</button>
       </form>
-
-      <div class="counter" id="counter"></div>
-
-      <div class="suggestions">
-        <h4>Sugestões Gerais</h4>
-        <textarea id="suggestionInput" placeholder="Deixe aqui sua sugestão..."></textarea>
-        <button onclick="submitSuggestion()">Enviar Sugestão</button>
-        <ul id="suggestionList"></ul>
-      </div>
-
-      <div class="actions" id="adminPanel">
-        <button onclick="adminExport()">Exportar CSV</button>
-        <button onclick="adminClear()">Excluir Todos</button>
-        <button onclick="logoutAdmin()">Sair</button>
-      </div>
-
-      <div id="loginContainer">
-        <h3>Login do Administrador</h3>
-        <input type="text" id="adminUser" placeholder="Usuário" />
-        <input type="password" id="adminPass" placeholder="Senha" />
-        <button onclick="loginAdmin()">Entrar</button>
-        <p id="loginMessage" style="color: red;"></p>
-      </div>
     </div>
-
     <div class="filter-column">
-      <div class="filter-bar">
-        <label for="filter">Filtrar por tipo:</label>
-        <select id="filter" onchange="filterReports()">
-          <option value="todos">Todos</option>
-          <option value="buraco">Buraco na via</option>
-          <option value="lampada">Lâmpada queimada</option>
-          <option value="outro">Outro</option>
-        </select>
+      <h3>Filtrar Problemas</h3>
+      <select id="filterType">
+        <option value="todos">Todos</option>
+        <option value="buraco">Buracos</option>
+        <option value="lampada">Lâmpadas</option>
+        <option value="outro">Outros</option>
+      </select>
+      <div class="counter">
+        <p>Total de problemas: <span id="totalCount">0</span></p>
       </div>
-      <div id="reports"></div>
+      <div id="reportList"></div>
+      <button id="exportCSV">Exportar CSV</button>
     </div>
   </div>
 
   <script>
-    function submitSuggestion() {
-      const input = document.getElementById("suggestionInput");
-      const list = document.getElementById("suggestionList");
-      if (input.value.trim()) {
-        const item = document.createElement("li");
-        item.textContent = input.value;
-        list.appendChild(item);
-        input.value = "";
-      }
-    }
-
-    function toggleLampadaFields() {
-      const type = document.getElementById("type").value;
-      document.getElementById("lampadaFields").style.display = type === "lampada" ? "block" : "none";
-    }
-
-    function filterReports() {
-      console.log("Filtrar relatórios por tipo");
-    }
-
-    // Inicializar o mapa
-    const map = L.map('map').setView([-8.1211, -35.2975], 13);
+    let map = L.map('map').setView([-8.1275, -35.2972], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
     map.on('click', function (e) {
-      const { lat, lng } = e.latlng;
-      document.getElementById('latitude').value = lat.toFixed(6);
-      document.getElementById('longitude').value = lng.toFixed(6);
-
-      if (window.lastMarker) {
-        map.removeLayer(window.lastMarker);
-      }
-      window.lastMarker = L.marker([lat, lng]).addTo(map);
+      document.getElementById('latitude').value = e.latlng.lat.toFixed(5);
+      document.getElementById('longitude').value = e.latlng.lng.toFixed(5);
     });
+
+    document.getElementById('type').addEventListener('change', function () {
+      document.getElementById('lampadaFields').style.display = this.value === 'lampada' ? 'block' : 'none';
+    });
+
+    let reports = JSON.parse(localStorage.getItem('reports') || '[]');
+
+    function saveReports() {
+      localStorage.setItem('reports', JSON.stringify(reports));
+    }
+
+    function renderReports() {
+      const container = document.getElementById('reportList');
+      container.innerHTML = '';
+      const typeFilter = document.getElementById('filterType').value;
+      const filtered = reports.filter(r => typeFilter === 'todos' || r.type === typeFilter);
+      document.getElementById('totalCount').textContent = filtered.length;
+
+      filtered.forEach((report, index) => {
+        const card = document.createElement('div');
+        card.className = `report-card ${report.type}`;
+        card.innerHTML = `
+          <strong>${report.type.toUpperCase()}</strong><br>
+          <small>Status: ${report.status}</small><br>
+          <small>Urgência: ${report.priority}</small><br>
+          <p>${report.description}</p>
+          ${report.type === 'lampada' && report.poste ? `<p>Poste: ${report.poste}</p>` : ''}
+          ${report.photo ? `<img src="${report.photo}" alt="foto">` : ''}
+          <small>Lat: ${report.latitude}, Lng: ${report.longitude}</small>
+          <div class="card-actions">
+            <button onclick="deleteReport(${index})">Excluir</button>
+          </div>
+        `;
+        container.appendChild(card);
+        L.marker([report.latitude, report.longitude]).addTo(map).bindPopup(report.description);
+      });
+    }
+
+    function deleteReport(index) {
+      reports.splice(index, 1);
+      saveReports();
+      renderReports();
+    }
+
+    document.getElementById('filterType').addEventListener('change', renderReports);
+
+    document.getElementById('reportForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const type = document.getElementById('type').value;
+      const poste = document.getElementById('poste').value;
+      const description = document.getElementById('description').value;
+      const priority = document.getElementById('priority').value;
+      const status = document.getElementById('status').value;
+      const latitude = document.getElementById('latitude').value;
+      const longitude = document.getElementById('longitude').value;
+      const file = document.getElementById('photo').files[0];
+      let photo = '';
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function () {
+          photo = reader.result;
+          addReport();
+        };
+        reader.readAsDataURL(file);
+      } else {
+        addReport();
+      }
+
+      function addReport() {
+        reports.push({ type, poste, description, priority, status, latitude, longitude, photo });
+        saveReports();
+        renderReports();
+        document.getElementById('reportForm').reset();
+        document.getElementById('lampadaFields').style.display = 'none';
+      }
+    });
+
+    document.getElementById('exportCSV').addEventListener('click', function () {
+      const csv = reports.map(r => `${r.type},${r.description},${r.priority},${r.status},${r.latitude},${r.longitude}`).join("\n");
+      const blob = new Blob(["Tipo,Descrição,Urgência,Status,Latitude,Longitude\n" + csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'relatorios.csv';
+      a.click();
+    });
+
+    renderReports();
   </script>
 </body>
 </html>
